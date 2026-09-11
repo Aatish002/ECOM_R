@@ -1,90 +1,55 @@
-import { useEffect, useState } from "react";
-import axios from "axios";
+import { useMemo, useState } from "react";
 import Cart from "./Cart";
+import { useSearchProductsQuery } from "../../Hooks/Query/Product/useSearchProductQuery";
+import { useProductsQuery } from "../../Hooks/Query/Product/useProductQuery";
 
 const Body = () => {
-  const [products, setProducts] = useState([]);
-  const [allProducts, setAllProducts] = useState([]);
-
   const [query, setQuery] = useState("");
-  const [search, setSearch] = useState("");
-
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
-
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
+  const [searchText, setSearchText] = useState("");
 
-  const perPage = 6;
+  // Infinite products
+  const { data, fetchNextPage, hasNextPage, isLoading, isFetchingNextPage } =
+    useProductsQuery();
 
-  const fetchProducts = async (pageNumber, reset = false) => {
-    const res = await axios.get(
-      `${import.meta.env.VITE_BASE_URL}/product?perPage=${perPage}&page=${pageNumber}`,
+  // Search products
+  const { data: searchedProducts = [] } = useSearchProductsQuery(searchText);
+
+  // Suggestions while typing
+  const { data: suggestions = [] } = useSearchProductsQuery(query);
+
+  // Flatten pages into a single array
+  const products = useMemo(() => {
+    if (!data) return [];
+
+    return data.pages.flatMap((page) => page.data);
+  }, [data]);
+
+  // Show searched products or normal products
+  const displayProducts = searchText.trim() ? searchedProducts : products;
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center text-white">
+        Loading...
+      </div>
     );
-
-    const newProducts = res.data.data;
-
-    setProducts((prev) => (reset ? newProducts : [...prev, ...newProducts]));
-
-    if (newProducts.length < perPage) setHasMore(false);
-  };
-
-  const fetchAllProducts = async () => {
-    const res = await axios.get(
-      `${import.meta.env.VITE_BASE_URL}/product?perPage=1000&page=1`,
-    );
-
-    setAllProducts(res.data.data);
-  };
-
-  useEffect(() => {
-    fetchProducts(1, true);
-    fetchAllProducts();
-  }, []);
-
-  const loadMore = () => {
-    const nextPage = page + 1;
-    setPage(nextPage);
-    fetchProducts(nextPage);
-  };
-
-  
-  const suggestions =
-    query && allProducts.length > 0
-      ? allProducts
-          .filter(
-            (p) =>
-              p.name?.toLowerCase().includes(query.toLowerCase()) ||
-              String(p.price).includes(query),
-          )
-          .slice(0, 5)
-      : [];
-
-  const applySearch = (value) => {
-    setSearch(value);
-    setShowSuggestions(false);
-    setActiveIndex(-1);
-  };
-
-  const displayProducts = search
-    ? allProducts.filter(
-        (p) =>
-          p.name?.toLowerCase().includes(search.toLowerCase()) ||
-          String(p.price).includes(search),
-      )
-    : products;
+  }
 
   return (
-    <div className="bg-black min-h-screen p-6">
-      <h1 className="font-[cursive] text-center text-yellow-500 text-[40px] mb-10">
-        DIFFERENT PRODUCTS
+    <div className="min-h-screen bg-gradient-to-b from-black via-[#0a0a0a] to-black text-white px-6 py-10">
+      {/* Title */}
+      <h1 className="text-center text-4xl md:text-5xl font-[cursive] tracking-widest text-yellow-400 mb-12">
+        OUR PRODUCTS
       </h1>
 
-      <div className="flex justify-center pb-5">
-        <div className="relative w-[450px]">
+      {/* Search */}
+      <div className="flex justify-center mb-10">
+        <div className="relative w-[500px]">
           <input
             type="text"
-            placeholder="SEARCH FOR PRODUCTS"
+            placeholder="Search streetwear, sneakers, drops..."
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
@@ -93,48 +58,54 @@ const Body = () => {
             }}
             onFocus={() => setShowSuggestions(true)}
             onKeyDown={(e) => {
-              if (!showSuggestions || suggestions.length === 0) return;
+              if (!suggestions.length) return;
 
               if (e.key === "ArrowDown") {
-                e.preventDefault();
+                setActiveIndex((prev) => (prev + 1) % suggestions.length);
+              }
+
+              if (e.key === "ArrowUp") {
                 setActiveIndex((prev) =>
-                  prev < suggestions.length - 1 ? prev + 1 : 0,
+                  prev <= 0 ? suggestions.length - 1 : prev - 1,
                 );
               }
 
-              else if (e.key === "ArrowUp") {
-                e.preventDefault();
-                setActiveIndex((prev) =>
-                  prev > 0 ? prev - 1 : suggestions.length - 1,
-                );
-              }
-
-              else if (e.key === "Enter") {
+              if (e.key === "Enter") {
                 e.preventDefault();
 
-                if (activeIndex >= 0) {
-                  const selected = suggestions[activeIndex];
-                  setQuery(selected.name);
-                  applySearch(selected.name);
-                } else {
-                  applySearch(query);
-                }
+                const selected =
+                  activeIndex >= 0 ? suggestions[activeIndex].name : query;
+
+                setQuery(selected);
+                setSearchText(selected);
+                setShowSuggestions(false);
+                setActiveIndex(-1);
               }
             }}
-            className="p-3 bg-white rounded-2xl w-full text-black"
+            className="
+              w-full p-4 rounded-2xl
+              bg-[#111] border border-gray-700
+              text-white outline-none
+              focus:border-yellow-400
+              focus:shadow-[0_0_15px_rgba(250,204,21,0.2)]
+            "
           />
 
+          {/* Suggestions */}
           {showSuggestions && suggestions.length > 0 && (
-            <div className="absolute w-full bg-white mt-2 rounded-xl shadow-lg z-50">
-              {suggestions.map((item, index) => (
+            <div className="absolute w-full mt-2 bg-[#111] border border-gray-800 rounded-xl overflow-hidden z-50">
+              {suggestions.map((item, i) => (
                 <div
                   key={item._id}
                   onClick={() => {
                     setQuery(item.name);
-                    applySearch(item.name);
+                    setSearchText(item.name);
+                    setShowSuggestions(false);
                   }}
-                  className={`p-2 cursor-pointer ${
-                    index === activeIndex ? "bg-gray-300" : "hover:bg-gray-200"
+                  className={`p-3 cursor-pointer text-sm ${
+                    i === activeIndex
+                      ? "bg-yellow-500 text-black"
+                      : "hover:bg-gray-800"
                   }`}
                 >
                   {item.name}
@@ -145,14 +116,36 @@ const Body = () => {
         </div>
 
         <button
-          onClick={() => applySearch(query)}
-          className="ml-3 bg-yellow-500 px-5 py-3 rounded-xl"
+          onClick={() => {
+            setSearchText(query);
+            setShowSuggestions(false);
+          }}
+          className="
+            ml-3 px-6 py-3 rounded-2xl font-bold
+            bg-yellow-400 text-black
+            hover:scale-105 transition
+            shadow-lg
+          "
         >
           Search
         </button>
+
+        {searchText && (
+          <button
+            onClick={() => {
+              setQuery("");
+              setSearchText("");
+              setShowSuggestions(false);
+            }}
+            className="ml-3 px-6 py-3 rounded-2xl font-bold bg-gray-700 hover:bg-gray-600"
+          >
+            Clear
+          </button>
+        )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 px-10">
+      {/* Products */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 px-6">
         {displayProducts.map((product) => (
           <Cart
             key={product._id}
@@ -166,13 +159,21 @@ const Body = () => {
         ))}
       </div>
 
-      {!search && hasMore && (
-        <div className="flex justify-center mt-8">
+      {/* Load More */}
+      {!searchText && hasNextPage && (
+        <div className="flex justify-center mt-12">
           <button
-            onClick={loadMore}
-            className="bg-yellow-500 px-6 py-2 rounded-xl"
+            onClick={() => fetchNextPage()}
+            disabled={isFetchingNextPage}
+            className="
+              px-8 py-3 rounded-2xl font-bold
+              bg-yellow-400 text-black
+              hover:scale-105 transition
+              shadow-lg
+              disabled:opacity-50
+            "
           >
-            Load More
+            {isFetchingNextPage ? "Loading..." : "Load More"}
           </button>
         </div>
       )}

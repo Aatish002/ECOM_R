@@ -1,6 +1,7 @@
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
 import axios from "axios";
+import { Smile } from "lucide-react";
 
 const Navbar = () => {
   const [user, setUser] = useState(null);
@@ -124,16 +125,22 @@ const Navbar = () => {
         {/* AUTH SECTION */}
         {user ? (
           <div className="relative" ref={dropdownRef}>
-            {/* USER BUTTON */}
             <button
               onClick={() => setIsDropdownOpen((prev) => !prev)}
               className="flex items-center gap-3 text-yellow-200 hover:text-yellow-400 transition"
             >
-              <img
-                src={user?.profilePic || "/default-avatar.png"}
-                alt="profile"
-                className="w-10 h-10 rounded-full object-cover border border-yellow-400"
-              />
+              {/* Avatar */}
+              {user?.profilePic ? (
+                <img
+                  src={user.profilePic}
+                  alt="profile"
+                  className="w-10 h-10 rounded-full object-cover border border-yellow-400"
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-full flex items-center justify-center">
+                  <Smile className="w-8 h-8 text-yellow-200" />
+                </div>
+              )}
 
               <span className="font-semibold text-sm sm:text-base">
                 {user?.userName || user?.name}
@@ -159,7 +166,6 @@ const Navbar = () => {
                   My Wishlist
                 </Link>
 
-                {/* CART ADDED */}
                 <Link
                   to="/cart"
                   onClick={() => setIsDropdownOpen(false)}
@@ -178,7 +184,6 @@ const Navbar = () => {
             )}
           </div>
         ) : (
-          /* GUEST */
           <div className="flex items-center border border-yellow-400/70 bg-black overflow-hidden rounded-md">
             <Link
               to="/login"
